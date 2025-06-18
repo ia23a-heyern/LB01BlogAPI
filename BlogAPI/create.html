@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BlogAPI - Post erstellen</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+<header>
+  <nav>
+    <div class="logo">
+      <i class="fas fa-blog"></i> BlogAPI
+    </div>
+    <ul class="nav-links">
+      <li><a href="index.html">Startseite</a></li>
+      <li><a href="posts.html">Alle Posts</a></li>
+      <li><a href="#" class="current-page">Post erstellen</a></li>
+      <li><a href="login.html">Login</a></li>
+    </ul>
+  </nav>
+</header>
+
+<div class="container">
+  <section class="hero">
+    <h1><i class="fas fa-plus-circle"></i> Neuen Post erstellen</h1>
+    <p>Teilen Sie Ihre Gedanken und Ideen mit der Welt</p>
+  </section>
+
+  <div class="card" style="max-width: 800px; margin: 0 auto;">
+    <form id="createPostForm" onsubmit="handleCreatePost(event)">
+      <div class="form-field">
+        <label for="title">
+          Titel <span style="color: red;">*</span>
+        </label>
+        <input
+                type="text"
+                id="title"
+                name="title"
+                required
+                maxlength="255"
+                placeholder="Geben Sie einen aussagekräftigen Titel ein"
+        >
+        <div id="titleError" class="error-message"></div>
+      </div>
+
+      <div class="form-field">
+        <label for="content">
+          Inhalt <span style="color: red;">*</span>
+        </label>
+        <textarea
+                id="content"
+                name="content"
+                required
+                rows="10"
+                maxlength="5000"
+                placeholder="Schreiben Sie hier Ihren Artikel (mindestens 10 Zeichen, maximal 5000 Zeichen)"
+        ></textarea>
+        <div class="char-counter">
+          <span id="contentCounter">0</span>/5000 Zeichen
+        </div>
+        <div id="contentError" class="error-message"></div>
+      </div>
+
+      <div class="form-field">
+        <label for="image">
+          Bild (optional)
+        </label>
+        <input
+                type="file"
+                id="image"
+                name="image"
+                accept="image/jpeg,image/jpg,image/png"
+        >
+        <div style="color: #666; font-size: 0.9rem; margin-top: 0.25rem;">
+          Erlaubte Formate: JPEG, PNG | Maximale Größe: 5MB
+        </div>
+        <div id="imageError" class="error-message"></div>
+
+        <!-- Image Preview -->
+        <div id="imagePreview" style="display: none; margin-top: 1rem;">
+          <img id="previewImg" style="max-width: 200px; height: auto; border-radius: 5px;" alt="Vorschau">
+          <button type="button" onclick="removeImage()" style="display: block; margin-top: 0.5rem; background: #dc3545; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 3px; cursor: pointer;">
+            <i class="fas fa-times"></i> Bild entfernen
+          </button>
+        </div>
+      </div>
+
+      <div style="text-align: center;">
+        <button type="submit" class="btn" style="margin-right: 1rem;">
+          <i class="fas fa-save"></i> Post erstellen
+        </button>
+        <a href="posts.html" class="btn" style="background: linear-gradient(45deg, #6c757d, #5a6268);">
+          <i class="fas fa-times"></i> Abbrechen
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<footer>
+  <p>&copy; 2025 BlogAPI - Entwickelt für LB1 Projekt</p>
+</footer>
+
+<script src="script.js"></script>
+<script>
+  // Setup form handlers beim Laden der Seite
+  document.addEventListener('DOMContentLoaded', function() {
+    setupCreateFormHandlers();
+  });
+
+  function setupCreateFormHandlers() {
+    // Character counter für Content
+    const contentField = document.getElementById('content');
+    if (contentField) {
+      contentField.addEventListener('input', function() {
+        const counter = document.getElementById('contentCounter');
+        if (counter) {
+          counter.textContent = this.value.length;
+
+          // Färbung basierend auf Länge
+          if (this.value.length > 4500) {
+            counter.style.color = '#dc3545';
+          } else if (this.value.length > 4000) {
+            counter.style.color = '#ffc107';
+          } else {
+            counter.style.color = '#666';
+          }
+        }
+      });
+    }
+
+    // Image preview
+    const imageField = document.getElementById('image');
+    if (imageField) {
+      imageField.addEventListener('change', function() {
+        handleImagePreview(this);
+      });
+    }
+  }
+
+  function handleImagePreview(input) {
+    const file = input.files[0];
+    const preview = document.getElementById('imagePreview');
+    const previewImg = document.getElementById('previewImg');
+
+    if (file) {
+      // Validierung
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+      const maxSize = 5 * 1024 * 1024; // 5MB
+
+      if (!allowedTypes.includes(file.type)) {
+        showError('imageError', 'Nur JPEG und PNG Dateien sind erlaubt');
+        input.value = '';
+        preview.style.display = 'none';
+        return;
+      }
+
+      if (file.size > maxSize) {
+        showError('imageError', 'Datei ist zu groß (max. 5MB)');
+        input.value = '';
+        preview.style.display = 'none';
+        return;
+      }
+
+      hideError('imageError');
+
+      // Preview anzeigen
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        previewImg.src = e.target.result;
+        preview.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    } else {
+      preview.style.display = 'none';
+    }
+  }
+
+  function removeImage() {
+    const imageField = document.getElementById('image');
+    const preview = document.getElementById('imagePreview');
+
+    imageField.value = '';
+    preview.style.display = 'none';
+    hideError('imageError');
+  }
+
+  function handleCreatePost(event) {
+    event.preventDefault();
+
+    const form = event.target;
+    const title = form.title.value.trim();
+    const content = form.content.value.trim();
+    const imageFile = form.image.files[0];
+
+    // Validierung
+    let isValid = true;
+
+    // Titel validieren
+    if (!title) {
+      showError('titleError', 'Titel ist ein Pflichtfeld');
+      isValid = false;
+    } else if (title.length > 255) {
+      showError('titleError', 'Titel darf maximal 255 Zeichen haben');
+      isValid = false;
+    } else {
+      hideError('titleError');
+    }
+
+    // Content validieren
+    if (!content) {
+      showError('contentError', 'Inhalt darf maximal 5000 Zeichen haben');
+      isValid = false;
+    } else {
+      hideError('contentError');
+    }
+
+    // Bild validieren (wenn vorhanden)
+    if (imageFile) {
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+      const maxSize = 5 * 1024 * 1024; // 5MB
+
+      if (!allowedTypes.includes(imageFile.type)) {
+        showError('imageError', 'Nur JPEG und PNG Dateien sind erlaubt');
+        isValid = false;
+      } else if (imageFile.size > maxSize) {
+        showError('imageError', 'Datei ist zu groß (max. 5MB)');
+        isValid = false;
+      } else {
+        hideError('imageError');
+      }
+    }
+
+    if (isValid) {
+      // Post erstellen
+      const newPost = {
+        id: nextPostId++,
+        title: title,
+        content: content,
+        image_path: imageFile ? `uploads/${imageFile.name}` : null,
+        user_id: currentUser ? currentUser.id : 1
+      };
+
+      posts.unshift(newPost);
+
+      // Erfolg anzeigen
+      showSuccessMessage('Post wurde erfolgreich erstellt!');
+
+      // Weiterleitung nach kurzer Verzögerung
+      setTimeout(() => {
+        window.location.href = 'posts.html';
+      }, 1500);
+    }
+  }
+</script>
+</body>
+</html>Inhalt ist ein Pflichtfeld');
+isValid = false;
+} else if (content.length < 10) {
+showError('contentError', 'Inhalt muss mindestens 10 Zeichen haben');
+isValid = false;
+} else if (content.length > 5000) {
+showError('contentError', '
