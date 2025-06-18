@@ -1,4 +1,5 @@
-// BlogAPI JavaScript Funktionalität
+// BlogAPI JavaScript - Vollständige Version mit Navigation
+// Alle Funktionen wurden konsolidiert und Fehler behoben
 
 // Globale Variablen
 let posts = [
@@ -7,21 +8,23 @@ let posts = [
         title: "Willkommen bei BlogAPI",
         content: "Dies ist der erste Post in unserem Blog-System. BlogAPI bietet eine einfache und intuitive Möglichkeit, Blog-Posts zu verwalten. Mit unserem System können Sie Posts erstellen, bearbeiten, löschen und durchsuchen.",
         image_path: null,
-        user_id: 1
+        user_id: 1,
+        created_at: new Date().toISOString()
     },
     {
         id: 2,
         title: "Features unserer Plattform",
         content: "Unsere BlogAPI-Plattform bietet zahlreiche Features: Sichere Validierung aller Eingaben, Upload von Bildern in JPEG und PNG Format, responsive Design für alle Geräte, und unterschiedliche Benutzerrollen für optimale Sicherheit.",
         image_path: null,
-        user_id: 1
+        user_id: 1,
+        created_at: new Date().toISOString()
     }
 ];
 
 let currentUser = null;
 let nextPostId = 3;
 
-// Navigation zwischen Seiten
+// NAVIGATION ZWISCHEN SEITEN (von index.js)
 function loadPage(page) {
     const content = document.getElementById('content');
     const navLinks = document.querySelectorAll('.nav-links a');
@@ -52,7 +55,7 @@ function loadPage(page) {
     }
 }
 
-// Seiten-Templates
+// SEITEN-TEMPLATES (von index.js)
 function getHomePage() {
     return `
         <section class="hero">
@@ -200,6 +203,14 @@ function getCreatePostPage() {
                         Erlaubte Formate: JPEG, PNG | Maximale Größe: 5MB
                     </div>
                     <div id="imageError" class="error-message"></div>
+                    
+                    <!-- Image Preview -->
+                    <div id="imagePreview" style="display: none; margin-top: 1rem;">
+                        <img id="previewImg" style="max-width: 200px; height: auto; border-radius: 5px;" alt="Vorschau">
+                        <button type="button" onclick="removeImage()" style="display: block; margin-top: 0.5rem; background: #dc3545; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 3px; cursor: pointer;">
+                            <i class="fas fa-times"></i> Bild entfernen
+                        </button>
+                    </div>
                 </div>
 
                 <div style="text-align: center;">
@@ -280,73 +291,169 @@ function getLoginPage() {
     `;
 }
 
-// Post-Funktionen
+// VALIDIERUNGS-FUNKTIONEN
+function validateTitle(title) {
+    const trimmed = title.trim();
+
+    if (!trimmed) {
+        return { valid: false, message: 'Titel ist ein Pflichtfeld' };
+    }
+
+    if (trimmed.length < 3) {
+        return { valid: false, message: 'Titel muss mindestens 3 Zeichen haben' };
+    }
+
+    if (trimmed.length > 255) {
+        return { valid: false, message: 'Titel darf maximal 255 Zeichen haben' };
+    }
+
+    return { valid: true, message: '' };
+}
+
+function validateContent(content) {
+    const trimmed = content.trim();
+
+    if (!trimmed) {
+        return { valid: false, message: 'Inhalt ist ein Pflichtfeld' };
+    }
+
+    if (trimmed.length < 10) {
+        return { valid: false, message: 'Inhalt muss mindestens 10 Zeichen haben' };
+    }
+
+    if (trimmed.length > 5000) {
+        return { valid: false, message: 'Inhalt darf maximal 5000 Zeichen haben' };
+    }
+
+    return { valid: true, message: '' };
+}
+
+function validateImage(file) {
+    if (!file) {
+        return { valid: true, message: '' }; // Optional field
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    const maxSize = 5 * 1024 * 1024; // 5MB
+
+    if (!allowedTypes.includes(file.type)) {
+        return { valid: false, message: 'Nur JPEG und PNG Dateien sind erlaubt' };
+    }
+
+    if (file.size > maxSize) {
+        return { valid: false, message: 'Datei ist zu groß (max. 5MB)' };
+    }
+
+    return { valid: true, message: '' };
+}
+
+// ERROR HANDLING
+function showError(elementId, message) {
+    const errorElement = document.getElementById(elementId);
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.classList.add('show');
+
+        const field = errorElement.closest('.form-field');
+        if (field) {
+            field.classList.add('error');
+        }
+    }
+}
+
+function hideError(elementId) {
+    const errorElement = document.getElementById(elementId);
+    if (errorElement) {
+        errorElement.textContent = '';
+        errorElement.classList.remove('show');
+
+        const field = errorElement.closest('.form-field');
+        if (field) {
+            field.classList.remove('error');
+        }
+    }
+}
+
+function showSuccessMessage(message) {
+    const existing = document.querySelectorAll('.temp-success-message');
+    existing.forEach(el => el.remove());
+
+    const successDiv = document.createElement('div');
+    successDiv.className = 'success-message temp-success-message';
+    successDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+        min-width: 300px;
+        animation: slideIn 0.3s ease;
+        max-width: 400px;
+        word-wrap: break-word;
+    `;
+    successDiv.innerHTML = `<i class="fas fa-check-circle"></i> ${message}`;
+
+    document.body.appendChild(successDiv);
+
+    setTimeout(() => {
+        if (successDiv.parentNode) {
+            successDiv.style.animation = 'slideOut 0.3s ease';
+            setTimeout(() => {
+                if (successDiv.parentNode) {
+                    successDiv.parentNode.removeChild(successDiv);
+                }
+            }, 300);
+        }
+    }, 3000);
+}
+
+// POST-FUNKTIONEN (korrigiert für SPA)
 function createPost(event) {
     event.preventDefault();
 
     const form = event.target;
-    const title = form.title.value.trim();
-    const content = form.content.value.trim();
+    const title = form.title.value;
+    const content = form.content.value;
     const imageFile = form.image.files[0];
 
-    // Validierung
     let isValid = true;
 
-    // Titel validieren
-    if (!title) {
-        showError('titleError', 'Titel ist ein Pflichtfeld');
-        isValid = false;
-    } else if (title.length > 255) {
-        showError('titleError', 'Titel darf maximal 255 Zeichen haben');
+    const titleValidation = validateTitle(title);
+    if (!titleValidation.valid) {
+        showError('titleError', titleValidation.message);
         isValid = false;
     } else {
         hideError('titleError');
     }
 
-    // Content validieren
-    if (!content) {
-        showError('contentError', 'Inhalt ist ein Pflichtfeld');
-        isValid = false;
-    } else if (content.length < 10) {
-        showError('contentError', 'Inhalt muss mindestens 10 Zeichen haben');
-        isValid = false;
-    } else if (content.length > 5000) {
-        showError('contentError', 'Inhalt darf maximal 5000 Zeichen haben');
+    const contentValidation = validateContent(content);
+    if (!contentValidation.valid) {
+        showError('contentError', contentValidation.message);
         isValid = false;
     } else {
         hideError('contentError');
     }
 
-    // Bild validieren (wenn vorhanden)
-    if (imageFile) {
-        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-        const maxSize = 5 * 1024 * 1024; // 5MB
-
-        if (!allowedTypes.includes(imageFile.type)) {
-            showError('imageError', 'Nur JPEG und PNG Dateien sind erlaubt');
-            isValid = false;
-        } else if (imageFile.size > maxSize) {
-            showError('imageError', 'Datei ist zu groß (max. 5MB)');
-            isValid = false;
-        } else {
-            hideError('imageError');
-        }
+    const imageValidation = validateImage(imageFile);
+    if (!imageValidation.valid) {
+        showError('imageError', imageValidation.message);
+        isValid = false;
+    } else {
+        hideError('imageError');
     }
 
     if (isValid) {
-        // Post erstellen
         const newPost = {
             id: nextPostId++,
-            title: title,
-            content: content,
+            title: title.trim(),
+            content: content.trim(),
             image_path: imageFile ? `uploads/${imageFile.name}` : null,
-            user_id: currentUser ? currentUser.id : 1
+            user_id: currentUser ? currentUser.id : 1,
+            created_at: new Date().toISOString()
         };
 
         posts.unshift(newPost);
-
-        // Erfolg anzeigen
         showSuccessMessage('Post wurde erfolgreich erstellt!');
+
         setTimeout(() => loadPage('posts'), 1500);
     }
 }
@@ -465,7 +572,6 @@ function editPost(postId) {
         </div>
     `;
 
-    // Setup form handlers für edit form
     setupEditFormHandlers();
 }
 
@@ -473,66 +579,46 @@ function updatePost(event, postId) {
     event.preventDefault();
 
     const form = event.target;
-    const title = form.title.value.trim();
-    const content = form.content.value.trim();
+    const title = form.title.value;
+    const content = form.content.value;
     const imageFile = form.image.files[0];
 
-    // Validierung
     let isValid = true;
 
-    // Titel validieren
-    if (!title) {
-        showError('editTitleError', 'Titel ist ein Pflichtfeld');
-        isValid = false;
-    } else if (title.length > 255) {
-        showError('editTitleError', 'Titel darf maximal 255 Zeichen haben');
+    const titleValidation = validateTitle(title);
+    if (!titleValidation.valid) {
+        showError('editTitleError', titleValidation.message);
         isValid = false;
     } else {
         hideError('editTitleError');
     }
 
-    // Content validieren
-    if (!content) {
-        showError('editContentError', 'Inhalt ist ein Pflichtfeld');
-        isValid = false;
-    } else if (content.length < 10) {
-        showError('editContentError', 'Inhalt muss mindestens 10 Zeichen haben');
-        isValid = false;
-    } else if (content.length > 5000) {
-        showError('editContentError', 'Inhalt darf maximal 5000 Zeichen haben');
+    const contentValidation = validateContent(content);
+    if (!contentValidation.valid) {
+        showError('editContentError', contentValidation.message);
         isValid = false;
     } else {
         hideError('editContentError');
     }
 
-    // Bild validieren (wenn vorhanden)
-    if (imageFile) {
-        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-        const maxSize = 5 * 1024 * 1024; // 5MB
-
-        if (!allowedTypes.includes(imageFile.type)) {
-            showError('editImageError', 'Nur JPEG und PNG Dateien sind erlaubt');
-            isValid = false;
-        } else if (imageFile.size > maxSize) {
-            showError('editImageError', 'Datei ist zu groß (max. 5MB)');
-            isValid = false;
-        } else {
-            hideError('editImageError');
-        }
+    const imageValidation = validateImage(imageFile);
+    if (!imageValidation.valid) {
+        showError('editImageError', imageValidation.message);
+        isValid = false;
+    } else {
+        hideError('editImageError');
     }
 
     if (isValid) {
-        // Post aktualisieren
         const postIndex = posts.findIndex(p => p.id === postId);
         if (postIndex !== -1) {
-            posts[postIndex].title = title;
-            posts[postIndex].content = content;
+            posts[postIndex].title = title.trim();
+            posts[postIndex].content = content.trim();
             if (imageFile) {
                 posts[postIndex].image_path = `uploads/${imageFile.name}`;
             }
         }
 
-        // Erfolg anzeigen
         showSuccessMessage('Post wurde erfolgreich aktualisiert!');
         setTimeout(() => showPost(postId), 1500);
     }
@@ -549,7 +635,7 @@ function deletePost(postId) {
     }
 }
 
-// Login/Logout Funktionen
+// LOGIN/LOGOUT FUNKTIONEN
 function login(event) {
     event.preventDefault();
 
@@ -557,7 +643,6 @@ function login(event) {
     const username = form.username.value.trim();
     const password = form.password.value.trim();
 
-    // Validierung
     let isValid = true;
 
     if (!username) {
@@ -575,7 +660,6 @@ function login(event) {
     }
 
     if (isValid) {
-        // Simulierte Benutzer-Authentifizierung
         if (username === 'Max15' && password === '12334') {
             currentUser = { id: 1, username: 'Max15', role: 'admin' };
             showSuccessMessage('Erfolgreich als Administrator angemeldet!');
@@ -614,9 +698,55 @@ function updateNavigation() {
     }
 }
 
-// Form Handler Setup
+// IMAGE HANDLING
+function handleImagePreview(input) {
+    const file = input.files[0];
+    const preview = document.getElementById('imagePreview');
+    const previewImg = document.getElementById('previewImg');
+
+    if (file) {
+        const validation = validateImage(file);
+
+        if (!validation.valid) {
+            showError('imageError', validation.message);
+            input.value = '';
+            if (preview) preview.style.display = 'none';
+            return;
+        }
+
+        hideError('imageError');
+
+        if (preview && previewImg) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImg.src = e.target.result;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    } else {
+        hideImagePreview();
+    }
+}
+
+function hideImagePreview() {
+    const preview = document.getElementById('imagePreview');
+    if (preview) {
+        preview.style.display = 'none';
+    }
+}
+
+function removeImage() {
+    const imageField = document.getElementById('image');
+    if (imageField) {
+        imageField.value = '';
+        hideImagePreview();
+        hideError('imageError');
+    }
+}
+
+// FORM HANDLER SETUP
 function setupFormHandlers() {
-    // Character counter für Content
     const contentField = document.getElementById('content');
     if (contentField) {
         contentField.addEventListener('input', function() {
@@ -624,7 +754,6 @@ function setupFormHandlers() {
             if (counter) {
                 counter.textContent = this.value.length;
 
-                // Färbung basierend auf Länge
                 if (this.value.length > 4500) {
                     counter.style.color = '#dc3545';
                 } else if (this.value.length > 4000) {
@@ -635,10 +764,16 @@ function setupFormHandlers() {
             }
         });
     }
+
+    const imageField = document.getElementById('image');
+    if (imageField) {
+        imageField.addEventListener('change', function() {
+            handleImagePreview(this);
+        });
+    }
 }
 
 function setupEditFormHandlers() {
-    // Character counter für Edit Content
     const editContentField = document.getElementById('editContent');
     if (editContentField) {
         editContentField.addEventListener('input', function() {
@@ -646,7 +781,6 @@ function setupEditFormHandlers() {
             if (counter) {
                 counter.textContent = this.value.length;
 
-                // Färbung basierend auf Länge
                 if (this.value.length > 4500) {
                     counter.style.color = '#dc3545';
                 } else if (this.value.length > 4000) {
@@ -659,61 +793,7 @@ function setupEditFormHandlers() {
     }
 }
 
-// Hilfsfunktionen
-function showError(elementId, message) {
-    const errorElement = document.getElementById(elementId);
-    if (errorElement) {
-        errorElement.textContent = message;
-        errorElement.classList.add('show');
-
-        // Feld als fehlerhaft markieren
-        const field = errorElement.closest('.form-field');
-        if (field) {
-            field.classList.add('error');
-        }
-    }
-}
-
-function hideError(elementId) {
-    const errorElement = document.getElementById(elementId);
-    if (errorElement) {
-        errorElement.classList.remove('show');
-
-        // Fehler-Markierung entfernen
-        const field = errorElement.closest('.form-field');
-        if (field) {
-            field.classList.remove('error');
-        }
-    }
-}
-
-function showSuccessMessage(message) {
-    // Erstelle temporäre Erfolgsmeldung
-    const successDiv = document.createElement('div');
-    successDiv.className = 'success-message';
-    successDiv.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 1000;
-        min-width: 300px;
-        animation: slideIn 0.3s ease;
-    `;
-    successDiv.innerHTML = `<i class="fas fa-check-circle"></i> ${message}`;
-
-    document.body.appendChild(successDiv);
-
-    // Entferne nach 3 Sekunden
-    setTimeout(() => {
-        successDiv.style.animation = 'slideOut 0.3s ease';
-        setTimeout(() => {
-            if (successDiv.parentNode) {
-                successDiv.parentNode.removeChild(successDiv);
-            }
-        }, 300);
-    }, 3000);
-}
-
+// UTILITY FUNCTIONS
 function escapeHtml(text) {
     if (typeof text !== 'string') return text;
     const div = document.createElement('div');
@@ -721,85 +801,297 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Utility Funktionen
 function formatDate(date) {
-    return new Date(date).toLocaleDateString('de-DE', {
+    if (!date) date = new Date();
+    return new Intl.DateTimeFormat('de-DE', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
-    });
+    }).format(new Date(date));
 }
 
-function truncateText(text, maxLength) {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
+function countWords(text) {
+    if (!text || typeof text !== 'string') return 0;
+    return text.trim().split(/\s+/).filter(word => word.length > 0).length;
 }
 
-// Keyboard Navigation
-document.addEventListener('keydown', function(e) {
-    // ESC zum Schließen von Modals/Zurück
-    if (e.key === 'Escape') {
-        const activeModal = document.querySelector('.modal');
-        if (activeModal) {
-            activeModal.style.display = 'none';
+// DELETE FUNCTIONS (für andere Seiten)
+function deletePostById(postId) {
+    if (!currentUser || currentUser.role !== 'admin') {
+        showSuccessMessage('Sie haben keine Berechtigung, Posts zu löschen');
+        return;
+    }
+
+    if (confirm('Sind Sie sicher, dass Sie diesen Post löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.')) {
+        const postIndex = posts.findIndex(p => p.id === postId);
+        if (postIndex !== -1) {
+            posts.splice(postIndex, 1);
+            showSuccessMessage('Post wurde erfolgreich gelöscht!');
+
+            if (typeof loadPostsOnPage === 'function') {
+                setTimeout(() => loadPostsOnPage(), 1000);
+            }
+        } else {
+            showSuccessMessage('Post konnte nicht gefunden werden');
         }
     }
+}
+
+function loadPostsOnPage() {
+    const container = document.getElementById('posts-container');
+    if (!container) return;
+
+    let postsHtml = '';
+    posts.forEach(post => {
+        postsHtml += `
+            <div class="card">
+                <h3>${escapeHtml(post.title)}</h3>
+                <p>${escapeHtml(post.content.substring(0, 150))}${post.content.length > 150 ? '...' : ''}</p>
+                <a href="post.html?id=${post.id}" class="btn">Vollständig lesen</a>
+                ${currentUser && currentUser.role === 'admin' ? `
+                    <a href="edit.html?id=${post.id}" class="btn" style="margin-left: 10px; background: linear-gradient(45deg, #28a745, #20c997);">Bearbeiten</a>
+                    <button onclick="deletePostById(${post.id})" class="btn" style="margin-left: 10px; background: linear-gradient(45deg, #dc3545, #e74c3c);">Löschen</button>
+                ` : ''}
+            </div>
+        `;
+    });
+
+    container.innerHTML = postsHtml;
+}
+
+// FUNKTIONEN FÜR ANDERE SEITEN (login.html, etc.)
+function handleLogin(event) {
+    event.preventDefault();
+
+    const form = event.target;
+    const username = form.username.value.trim();
+    const password = form.password.value.trim();
+    const loginButton = document.getElementById('loginButton');
+
+    if (loginButton) {
+        loginButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Anmelden...';
+        loginButton.disabled = true;
+    }
+
+    let isValid = true;
+
+    if (!username) {
+        showError('usernameError', 'Benutzername ist erforderlich');
+        isValid = false;
+    } else if (username.length < 3) {
+        showError('usernameError', 'Benutzername muss mindestens 3 Zeichen haben');
+        isValid = false;
+    } else {
+        hideError('usernameError');
+    }
+
+    if (!password) {
+        showError('passwordError', 'Passwort ist erforderlich');
+        isValid = false;
+    } else if (password.length < 4) {
+        showError('passwordError', 'Passwort muss mindestens 4 Zeichen haben');
+        isValid = false;
+    } else {
+        hideError('passwordError');
+    }
+
+    setTimeout(() => {
+        if (isValid) {
+            if (username === 'Max15' && password === '12334') {
+                currentUser = { id: 1, username: 'Max15', role: 'admin' };
+                showSuccessMessage('Erfolgreich als Administrator angemeldet!');
+
+                setTimeout(() => {
+                    window.location.href = 'posts.html';
+                }, 1500);
+
+            } else if (username === 'User1' && password === 'pass123') {
+                currentUser = { id: 2, username: 'User1', role: 'user' };
+                showSuccessMessage('Erfolgreich als Benutzer angemeldet!');
+
+                setTimeout(() => {
+                    window.location.href = 'posts.html';
+                }, 1500);
+
+            } else {
+                showError('passwordError', 'Ungültige Anmeldedaten. Bitte überprüfen Sie Benutzername und Passwort.');
+                resetLoginButton();
+            }
+        } else {
+            resetLoginButton();
+        }
+    }, 500);
+
+    function resetLoginButton() {
+        if (loginButton) {
+            loginButton.innerHTML = '<i class="fas fa-sign-in-alt"></i> Anmelden';
+            loginButton.disabled = false;
+        }
+    }
+}
+
+function handleLogout() {
+    if (confirm('Möchten Sie sich wirklich abmelden?')) {
+        currentUser = null;
+        showSuccessMessage('Sie wurden erfolgreich abgemeldet!');
+
+        setTimeout(() => {
+            window.location.href = 'index.html';
+        }, 1500);
+    }
+}
+
+function handleCreatePost(event) {
+    event.preventDefault();
+
+    const form = event.target;
+    const title = form.title.value;
+    const content = form.content.value;
+    const imageFile = form.image.files[0];
+
+    let isValid = true;
+
+    const titleValidation = validateTitle(title);
+    if (!titleValidation.valid) {
+        showError('titleError', titleValidation.message);
+        isValid = false;
+    } else {
+        hideError('titleError');
+    }
+
+    const contentValidation = validateContent(content);
+    if (!contentValidation.valid) {
+        showError('contentError', contentValidation.message);
+        isValid = false;
+    } else {
+        hideError('contentError');
+    }
+
+    const imageValidation = validateImage(imageFile);
+    if (!imageValidation.valid) {
+        showError('imageError', imageValidation.message);
+        isValid = false;
+    } else {
+        hideError('imageError');
+    }
+
+    if (isValid) {
+        const newPost = {
+            id: nextPostId++,
+            title: title.trim(),
+            content: content.trim(),
+            image_path: imageFile ? `uploads/${imageFile.name}` : null,
+            user_id: currentUser ? currentUser.id : 1,
+            created_at: new Date().toISOString()
+        };
+
+        posts.unshift(newPost);
+        showSuccessMessage('Post wurde erfolgreich erstellt!');
+
+        form.reset();
+        hideImagePreview();
+
+        setTimeout(() => {
+            window.location.href = 'posts.html';
+        }, 1500);
+    }
+}
+
+function setupCreateFormHandlers() {
+    const contentField = document.getElementById('content');
+    if (contentField) {
+        contentField.addEventListener('input', function() {
+            const counter = document.getElementById('contentCounter');
+            if (counter) {
+                counter.textContent = this.value.length;
+
+                if (this.value.length > 4500) {
+                    counter.style.color = '#dc3545';
+                } else if (this.value.length > 4000) {
+                    counter.style.color = '#ffc107';
+                } else {
+                    counter.style.color = '#666';
+                }
+            }
+        });
+    }
+
+    const imageField = document.getElementById('image');
+    if (imageField) {
+        imageField.addEventListener('change', function() {
+            handleImagePreview(this);
+        });
+    }
+}
+
+function togglePassword() {
+    const passwordField = document.getElementById('password');
+    const toggleIcon = document.getElementById('passwordToggleIcon');
+
+    if (passwordField && toggleIcon) {
+        if (passwordField.type === 'password') {
+            passwordField.type = 'text';
+            toggleIcon.className = 'fas fa-eye-slash';
+        } else {
+            passwordField.type = 'password';
+            toggleIcon.className = 'fas fa-eye';
+        }
+    }
+}
+
+function quickLogin(type) {
+    if (type === 'admin') {
+        document.getElementById('username').value = 'Max15';
+        document.getElementById('password').value = '12334';
+    } else {
+        document.getElementById('username').value = 'User1';
+        document.getElementById('password').value = 'pass123';
+    }
+
+    document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+}
+
+// ERROR PREVENTION
+window.addEventListener('error', function(e) {
+    console.error('JavaScript Error:', e.error);
+    e.preventDefault();
 });
 
-// Animations CSS (wird dynamisch hinzugefügt)
-const animationStyles = `
-    @keyframes slideIn {
-        from {
-            transform: translateX(100%);
-            opacity: 0;
-        }
-        to {
-            transform: translateX(0);
-            opacity: 1;
-        }
-    }
-    
-    @keyframes slideOut {
-        from {
-            transform: translateX(0);
-            opacity: 1;
-        }
-        to {
-            transform: translateX(100%);
-            opacity: 0;
-        }
-    }
-`;
+window.addEventListener('unhandledrejection', function(e) {
+    console.error('Unhandled Promise Rejection:', e.reason);
+    e.preventDefault();
+});
 
-// Füge Animationen zum Head hinzu
+// ANIMATIONS CSS
 if (!document.getElementById('animation-styles')) {
+    const animationStyles = `
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+    `;
+
     const styleSheet = document.createElement('style');
     styleSheet.id = 'animation-styles';
     styleSheet.textContent = animationStyles;
     document.head.appendChild(styleSheet);
 }
 
-// Initialisierung
+// INITIALIZATION
 document.addEventListener('DOMContentLoaded', function() {
-    // Standard-Seite laden
-    loadPage('home');
+    // Standard-Seite laden wenn auf index.html
+    if (document.getElementById('content')) {
+        loadPage('home');
+    }
 
     // Service Worker registrieren (optional für PWA)
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js').catch(console.error);
     }
-});
-
-// Error Handling
-window.addEventListener('error', function(e) {
-    console.error('JavaScript Error:', e.error);
-    showSuccessMessage('Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.');
-});
-
-// Unhandled Promise Rejections
-window.addEventListener('unhandledrejection', function(e) {
-    console.error('Unhandled Promise Rejection:', e.reason);
-    e.preventDefault();
 });
